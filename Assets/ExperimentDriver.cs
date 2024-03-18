@@ -142,23 +142,19 @@ public class ExperimentDriver : MonoBehaviour
         //var elapsedTimes = new Dictionary<int, double>();
         foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
         {
-            if (letterTypeDropdown.value == (int)LetterType.SLOAN)
+            if (time >= 0f)
             {
-                if (time < 0f)
-                {
-                    //yield return ets.WaitForSpace();
-                    //elapsedTimes[ets.order] = timeElapse.Elapsed.TotalSeconds;
-                }
-                else
+
+                if (letterTypeDropdown.value == (int)LetterType.SLOAN)
                 {
                     yield return ets.WaitForLetterInput("?");
                     fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
                 }
-            }
-            else
-            {
-                yield return ets.WaitForArrowInput(displayText: "?");
-                fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
+                else
+                {
+                    yield return ets.WaitForArrowInput(displayText: "?");
+                    fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
+                }
             }
 
             yield return null;
@@ -166,21 +162,24 @@ public class ExperimentDriver : MonoBehaviour
 
         if(time < 0f)
         {
-            if (letterTypeDropdown.value == (int)LetterType.SLOAN)
+            yield return WaitForSpace();
+            timeElapse.Stop();
+            foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
+            ets.Clear();
+
+            foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
             {
-                yield return WaitForSpace();
-                timeElapse.Stop();
-                foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
-                    ets.Clear();
-                foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
+                if (letterTypeDropdown.value == (int)LetterType.SLOAN)
                 {
                     yield return ets.WaitForLetterInput("?");
-                    fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
                 }
-            }
-            else
-            {
-                timeElapse.Stop();
+                else
+                {
+                    yield return ets.WaitForArrowInput(displayText: "?");
+                }
+                fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
+
+                yield return null;
             }
 
             if(timeElapse.Elapsed < highScore && eyeTestSurfaces.All(ets => ets.IsCorrect))
