@@ -39,7 +39,7 @@ public class EyeTestSurface : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.KeypadEnter))
+        if (Input.GetKeyDown(KeyCode.LeftControl))
         {
             NextRandomSymbol(-1);
         }
@@ -69,7 +69,7 @@ public class EyeTestSurface : MonoBehaviour
 
     public void Clear()
     {
-        tmpText.text = string.Empty;
+        tmpText.text = order == 1 ? "?" : string.Empty;
         tmpText.color = Color.red;
         tmpText.rectTransform.localEulerAngles = Vector3.zero;
     }

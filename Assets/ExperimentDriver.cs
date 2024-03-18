@@ -14,16 +14,16 @@ using Random = UnityEngine.Random;
 public class ExperimentDriver : MonoBehaviour
 {
     public TMP_InputField visualizeTimeInput;
+    public TMP_InputField visualizeTimeIncrementInput;
+    public TMP_InputField visualizeTimeMinInput;
     public TMP_Text countdownTimerText;
     public TMP_Text highScoreText;
     public int countdownTime;
     public float timeout;
     public int roundsPerVisualizeTime;
-    public int maxRounds;
-    public float visualizeTimeDecrement;
+    //public int maxRounds;
     public FileDriver fileOutput;
     public TMP_Dropdown vergenceDropdown;
-    public MoveMe vergenceObject;
     public Slider vergenceSlider;
     public TMP_Dropdown letterTypeDropdown;
     public ActivateAllDisplays displayManager;
@@ -31,8 +31,6 @@ public class ExperimentDriver : MonoBehaviour
 
     Coroutine procedureCoroutine;
     int round;
-    readonly List<SurfaceType> readonlySurfaceTypes = new List<SurfaceType>();
-    List<SurfaceType> roundVergence = new List<SurfaceType>();
 
     float nearDisparity
     {
@@ -62,6 +60,7 @@ public class ExperimentDriver : MonoBehaviour
             }
         }
     }
+    float visualizeTimeDecrement => -float.Parse(visualizeTimeIncrementInput.text);
 
     //bool calibrated;
     TimeSpan highScore = TimeSpan.MaxValue;
@@ -71,12 +70,6 @@ public class ExperimentDriver : MonoBehaviour
     {
         countdownTimerText.text = string.Empty;
         highScoreText.text = string.Empty;
-
-        for (int i = 0; i < roundsPerVisualizeTime / 2; i++)
-        {
-            readonlySurfaceTypes.Add(SurfaceType.NEAR);
-            readonlySurfaceTypes.Add(SurfaceType.FAR);
-        }
 
         ChangeAccommodation(accommodationDropdown.value);
     }
@@ -93,7 +86,6 @@ public class ExperimentDriver : MonoBehaviour
         round = 0;
         highScore = TimeSpan.MaxValue;
         highScoreText.text = String.Empty;
-        roundVergence = new List<SurfaceType>(readonlySurfaceTypes);
 
         CancelInvoke(nameof(RepeatingRoutine));
 
@@ -141,14 +133,6 @@ public class ExperimentDriver : MonoBehaviour
         // --- Set independent variables
         foreach(var ets in eyeTestSurfaces)
             ets.NextRandomSymbol(time);
-
-        var randomIdx = Random.Range(0, roundVergence.Count);//Random.Range(0, 2);
-        var nearOrFar = roundVergence.ElementAt(randomIdx);//randomIdx == 0 ? SurfaceType.NEAR : SurfaceType.FAR;
-        roundVergence.RemoveAt(randomIdx);
-        vergenceDropdown.value = randomIdx;
-        vergenceSlider.value = nearOrFar == SurfaceType.NEAR ? nearDisparity : farDisparity;
-
-        SetVergenceNearOrFar(randomIdx);
 
         // ---
 
@@ -210,34 +194,15 @@ public class ExperimentDriver : MonoBehaviour
             highScoreText.text = String.Empty;
             if(round % roundsPerVisualizeTime == 0)
             {
-                visualizeTimeInput.text = (time - visualizeTimeDecrement).ToString();
+                time -= visualizeTimeDecrement;
+                visualizeTimeInput.text = (time).ToString();
             }
-        }
-        /*
-        if (letterTypeDropdown.value == (int)LetterType.SLOAN && time < 0f)
-        {
-            foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
-            {
-                yield return ets.WaitForLetterInput("?");
-                fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, elapsedTimes[ets.order], ets.letterType);
-            }
-
-            if (elapsedTimes[2] < highScore.TotalSeconds && eyeTestSurfaces.All(ets => ets.IsCorrect))
-            {
-                var decimalPart = elapsedTimes[2].ToString().Split('.')[1];
-                highScore = new TimeSpan(0, 0, 0, (int)elapsedTimes[0], int.Parse(decimalPart));
-                highScoreText.text = timeElapse.Elapsed.TotalSeconds.ToString("0.000");
-            }
-        }*/
-
-        if (round % roundsPerVisualizeTime == 0)
-        {
-            roundVergence = new List<SurfaceType>(readonlySurfaceTypes);
         }
 
         if (timeout < 0f)
         {
-            if (round >= maxRounds)
+            var minTime = float.Parse(visualizeTimeMinInput.text);
+            if (time <= minTime && (round % roundsPerVisualizeTime == 0))
             {
                 highScoreText.text = "DONE";
             }
@@ -260,8 +225,10 @@ public class ExperimentDriver : MonoBehaviour
 
     public void SetVergenceNearOrFar(int index)
     {
-        //if (calibrated)
-            vergenceObject.SetPositionZ((SurfaceType)index == SurfaceType.NEAR ? nearDisparity : farDisparity);
+        var vergenceValue = (SurfaceType)index == SurfaceType.NEAR ? nearDisparity : farDisparity;
+        //vergenceObject.SetPositionZ(vergenceValue);
+        //vergenceSlider.SetValueWithoutNotify(vergenceValue);
+        vergenceSlider.value = vergenceValue;
     }
 
     public void SavePersistantObjects()

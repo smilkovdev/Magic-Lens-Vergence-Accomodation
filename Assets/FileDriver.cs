@@ -16,6 +16,7 @@ public class FileDriver : MonoBehaviour
     public TMP_Dropdown vergenceDropdown;
     public Slider nearScaleSlider;
     public Slider farScaleSlider;
+    public Slider depthSlider;
 
     // Start is called before the first frame update
     void Start()
@@ -31,12 +32,12 @@ public class FileDriver : MonoBehaviour
 
     public void WriteToFile(int displayNum, SurfaceType displayType, string question, string answer, bool correct, int round, double answerTimeSeconds, LetterType letterType)
     {
-        // datetime; name; accommodation; vergence; visible_seconds; display_num; display_type; question; answer; correct; round; answer_seconds; letter_type; near_scale; far_scale
-        // 11/03/1990 10:59:20; Geert; NEAR; FAR; 1.5; 0; FAR; V; U; 0; 1; 0.987654321; SLOAN; 0.5; 1.2
+        // datetime; name; accommodation; vergence; visible_seconds; display_num; display_type; question; answer; correct; round; answer_seconds; letter_type; near_scale; far_scale; depth
+        // 11/03/1990 10:59:20; Geert; NEAR; FAR; 1.5; 0; FAR; V; U; 0; 1; 0.987654321; SLOAN; 0.5; 1.2; 0.70
         var path = Path.Combine(Application.persistentDataPath, optionalPath, $"{nameInput.text}.csv");
 
         if (!File.Exists(path))
-            File.AppendAllLines(path, new string[] { "sep=;", "datetime; name; accommodation; vergence; visible_seconds; display_num; display_type; question; answer; correct; round; answer_seconds; letter_type; near_scale; far_scale" } );
+            File.AppendAllLines(path, new string[] { "sep=;", "datetime; name; accommodation; vergence; visible_seconds; display_num; display_type; question; answer; correct; round; answer_seconds; letter_type; near_scale; far_scale; depth" } );
 
         var values = new string[]
         {
@@ -54,7 +55,8 @@ public class FileDriver : MonoBehaviour
             answerTimeSeconds.ToString(),
             letterType.ToString(),
             nearScaleSlider.value.ToString(),
-            farScaleSlider.value.ToString()
+            farScaleSlider.value.ToString(),
+            depthSlider.value.ToString(),
         };
 
         File.AppendAllLines(path, new string[] { string.Join(";", values) });

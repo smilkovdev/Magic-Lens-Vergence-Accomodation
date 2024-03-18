@@ -8,6 +8,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Near Accommodation.unity
     guid: 9fc0d4010bbf28b4594072e72b8655ab
+  - enabled: 0
+    path: Assets/Scenes/DLP Link.unity
+    guid: b1e955c6811494f65b5380759a3160f9
   m_configObjects:
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: a87233e56e5fe0d469c9c97baf664105, type: 2}
     com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 22cb862d094db764aa934931d44c55d3, type: 2}

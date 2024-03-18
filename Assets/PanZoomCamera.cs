@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 [RequireComponent(typeof(Camera))]
 public class PanZoomCamera : MonoBehaviour
@@ -12,6 +13,7 @@ public class PanZoomCamera : MonoBehaviour
 
     Camera cam;
     Vector3 prevMousePosition;
+    private bool dragging;
 
     // Start is called before the first frame update
     void Start()
@@ -25,10 +27,17 @@ public class PanZoomCamera : MonoBehaviour
         if (Display.RelativeMouseAt(Input.mousePosition).z != cam.targetDisplay)
             return;
 
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(0) && !EventSystem.current.IsPointerOverGameObject())
+        {
             prevMousePosition = Input.mousePosition;
+            dragging = true;
+        }
+        else if (Input.GetMouseButtonUp(0))
+        {
+            dragging = false;
+        }
 
-        if(Input.GetMouseButton(0))
+        if (Input.GetMouseButton(0) && dragging)
         {
             var delta = Input.mousePosition - prevMousePosition;
             cam.transform.Translate(delta * Speed);
