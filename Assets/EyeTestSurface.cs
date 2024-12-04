@@ -13,7 +13,7 @@ public class EyeTestSurface : MonoBehaviour
     public TMP_Text tmpText;
     public int order;
 
-    readonly string[] sloanLetters = new[] { "C", "D", "H", "K", "N", "O", "R", "S", "V" };//, "Z" }; // No Z because of Slovene keyboard
+    readonly string[] sloanLetters = new[] { "C", "D", "H", "K", "N", "O", "R", "S", "V" };
     readonly int[] landholtRotations = new[] { 0, 90, 180, 270 };
     float previousZEuler;
     string previousText;
@@ -56,14 +56,14 @@ public class EyeTestSurface : MonoBehaviour
             case LetterType.LANDHOLT:
                 tmpText.text = "C";
                 tmpText.rectTransform.localEulerAngles = Vector3.forward * 
-                    landholtRotations[Random.Range(0, landholtRotations.Length)]; 
+                    landholtRotations[Random.Range(0, landholtRotations.Length)];
                 break;
         }
 
         previousZEuler = tmpText.rectTransform.localEulerAngles.z;
         previousText = tmpText.text;
 
-        if(visibleSeconds > 0f)
+        if (visibleSeconds > 0f)
             Invoke(nameof(Clear), visibleSeconds);
     }
 
@@ -79,7 +79,7 @@ public class EyeTestSurface : MonoBehaviour
         letterType = (LetterType)type;
     }
 
-    public IEnumerator WaitForArrowInput(string displayText="")
+    public IEnumerator WaitForArrowInput(string displayText = "")
     {
         var wait = true;
         while (wait)
@@ -133,8 +133,7 @@ public class EyeTestSurface : MonoBehaviour
                     break;
                 }
             }
-            //if(wait)
-                yield return null;
+            yield return null;
         }
 
         tmpText.color = IsCorrect ? Color.green : Color.gray;
@@ -146,7 +145,7 @@ public class EyeTestSurface : MonoBehaviour
         {
             yield return null;
         }
-        tmpText.text = String.Empty;
+        tmpText.text = string.Empty;
     }
 
     public bool IsCorrect
@@ -180,6 +179,7 @@ public class EyeTestSurface : MonoBehaviour
             }
         }
     }
+
     public string Answer
     {
         get
@@ -195,4 +195,34 @@ public class EyeTestSurface : MonoBehaviour
             }
         }
     }
+
+    // New method for setting the symbol based on a specific orientation
+   public void SetSymbol(string orientation)
+    {
+        tmpText.text = "C"; // Ensure the symbol is set to a Landolt C
+
+        switch (orientation)
+        {
+            case "Up":
+                tmpText.rectTransform.localEulerAngles = Vector3.forward * 90;
+                break;
+            case "Down":
+                tmpText.rectTransform.localEulerAngles = Vector3.forward * 270;
+                break;
+            case "Left":
+                tmpText.rectTransform.localEulerAngles = Vector3.forward * 180;
+                break;
+            case "Right":
+                tmpText.rectTransform.localEulerAngles = Vector3.forward * 0;
+                break;
+            default:
+                UnityEngine.Debug.LogWarning("Unknown orientation specified.");
+                tmpText.rectTransform.localEulerAngles = Vector3.zero; // Default fallback
+                break;
+        }
+
+        previousZEuler = tmpText.rectTransform.localEulerAngles.z;
+        previousText = tmpText.text;
+    }
+
 }
