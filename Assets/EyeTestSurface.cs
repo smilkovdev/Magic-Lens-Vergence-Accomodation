@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq; 
 using TMPro;
 using UnityEngine;
 using Random = UnityEngine.Random;
@@ -17,6 +18,7 @@ public class EyeTestSurface : MonoBehaviour
     readonly int[] landholtRotations = new[] { 0, 90, 180, 270 };
     float previousZEuler;
     string previousText;
+    private readonly List<string> orientations = new List<string> { "Up", "Down", "Left", "Right" };
 
     public enum SurfaceType
     {
@@ -36,27 +38,21 @@ public class EyeTestSurface : MonoBehaviour
         
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.LeftControl))
-        {
-            NextRandomSymbol(-1);
-        }
-    }
 
-    public void NextRandomSymbol(float visibleSeconds)
+    public void NextRandomSymbol(float visibleSeconds, int round, List<string> orientationsToUse)
     {
         switch (letterType)
         {
-            case LetterType.SLOAN: 
+            case LetterType.SLOAN:
                 tmpText.text = sloanLetters[Random.Range(0, sloanLetters.Length)];
                 tmpText.rectTransform.localEulerAngles = Vector3.zero;
                 break;
+
             case LetterType.LANDHOLT:
-                tmpText.text = "C";
-                tmpText.rectTransform.localEulerAngles = Vector3.forward * 
-                    landholtRotations[Random.Range(0, landholtRotations.Length)];
+                // Assign orientation based on order
+                string orientation = orientationsToUse[order % orientationsToUse.Count];
+                SetOrientation(orientation);
+                tmpText.text = "C"; // Always "C" for Landolt C
                 break;
         }
 
@@ -66,6 +62,29 @@ public class EyeTestSurface : MonoBehaviour
         if (visibleSeconds > 0f)
             Invoke(nameof(Clear), visibleSeconds);
     }
+
+    private void SetOrientation(string orientation)
+{
+    switch (orientation)
+    {
+        case "Up":
+            tmpText.rectTransform.localEulerAngles = Vector3.forward * 90;
+            break;
+        case "Down":
+            tmpText.rectTransform.localEulerAngles = Vector3.forward * 270;
+            break;
+        case "Left":
+            tmpText.rectTransform.localEulerAngles = Vector3.forward * 180;
+            break;
+        case "Right":
+            tmpText.rectTransform.localEulerAngles = Vector3.forward * 0;
+            break;
+        default:
+            tmpText.rectTransform.localEulerAngles = Vector3.zero; // Default fallback
+            break;
+    }
+}
+
 
     public void Clear()
     {

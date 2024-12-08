@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Xml;
 using TMPro;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
 using static EyeTestSurface;
@@ -19,6 +21,7 @@ public class ExperimentDriver : MonoBehaviour
     public int countdownTime;
     public float timeout;
     public int roundsPerVisualizeTime;
+    //public int maxRounds;
     public FileDriver fileOutput;
     public TMP_Dropdown vergenceDropdown;
     public Slider vergenceSlider;
@@ -36,27 +39,44 @@ public class ExperimentDriver : MonoBehaviour
     {
         get
         {
-            return accommodationDropdown.value == 0 ? 0f : displayManager.NearDistance - displayManager.FarDistance;
+            if(accommodationDropdown.value == 0) // NEAR
+            {
+                return 0f;
+            }
+            else // FAR
+            {
+                return displayManager.NearDistance - displayManager.FarDistance;
+            }
         }
     }
-
     float farDisparity
     {
         get
         {
-            return accommodationDropdown.value == 0 ? displayManager.FarDistance - displayManager.NearDistance : 0f;
+            if (accommodationDropdown.value == 0) // NEAR
+            {
+                return displayManager.FarDistance - displayManager.NearDistance;
+            }
+            else // FAR
+            {
+                return 0f;
+            }
         }
     }
-
     float visualizeTimeDecrement => -float.Parse(visualizeTimeIncrementInput.text);
+
+    //bool calibrated;
     TimeSpan highScore = TimeSpan.MaxValue;
 
+    // Start is called before the first frame update
     void Start()
     {
         countdownTimerText.text = string.Empty;
         highScoreText.text = string.Empty;
+
         ChangeAccommodation(accommodationDropdown.value);
     }
+
 
     public void StartProcedure()
     {
@@ -68,17 +88,19 @@ public class ExperimentDriver : MonoBehaviour
 
         round = 0;
         highScore = TimeSpan.MaxValue;
-        highScoreText.text = string.Empty;
+        highScoreText.text = String.Empty;
 
         CancelInvoke(nameof(RepeatingRoutine));
 
         if (timeout < 0f)
         {
+            // Do not automatically repeat
             RepeatingRoutine();
         }
         else
         {
             var repeatRate = time + countdownTime + timeout;
+
             InvokeRepeating(nameof(RepeatingRoutine), 0f, repeatRate);
         }
     }
@@ -88,128 +110,129 @@ public class ExperimentDriver : MonoBehaviour
         if (procedureCoroutine != null)
             StopCoroutine(procedureCoroutine);
 
-        procedureCoroutine = StartCoroutine(VisualizeControlledLettersForTime());
+        procedureCoroutine = StartCoroutine(VisualizeRandomLettersForTime());
     }
 
-IEnumerator VisualizeControlledLettersForTime()
-{
-    if (!float.TryParse(visualizeTimeInput.text, out float time))
-        yield break;
 
-    round++;
-    var eyeTestSurfaces = FindObjectsOfType<EyeTestSurface>();
-    foreach (var ets in eyeTestSurfaces)
-        ets.Clear();
 
-    for (int i = 0; i < countdownTime; i++)
+    IEnumerator VisualizeRandomLettersForTime()
     {
-        countdownTimerText.text = (countdownTime - i).ToString();
-        yield return new WaitForSeconds(0.5f);
-    }
+        if (!float.TryParse(visualizeTimeInput.text, out float time))
+            yield break;
 
-    countdownTimerText.text = string.Empty;
+        round++;
 
-    // Get symbols based on the current round (difficulty)
-    List<string> symbolsToDisplay;
-    if (round <= 10)
-    {
-        symbolsToDisplay = GetEasySymbols(eyeTestSurfaces.Length);
-    }
-    else if (round <= 20)
-    {
-        symbolsToDisplay = GetMediumSymbols(eyeTestSurfaces.Length);
-    }
-    else
-    {
-        symbolsToDisplay = GetHardSymbols(eyeTestSurfaces.Length);
-    }
-
-    // Display all symbols for a second
-    for (int i = 0; i < eyeTestSurfaces.Length; i++)
-    {
-        eyeTestSurfaces[i].SetSymbol(symbolsToDisplay[i]);
-    }
-    yield return new WaitForSeconds(1f);
-
-    // Clear the symbols after showing them
-    foreach (var ets in eyeTestSurfaces)
-        ets.Clear();
-
-    var timeElapse = new Stopwatch();
-    timeElapse.Start();
-
-    // Wait for separate user input for each EyeTestSurface
-    foreach (var ets in eyeTestSurfaces)
-    {
-        yield return StartCoroutine(WaitForSingleInput(ets));
-        fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
-    }
-
-    timeElapse.Stop();
-
-    if (time < 0f)
-    {
-        yield return WaitForSpace();
+        var eyeTestSurfaces = FindObjectsOfType<EyeTestSurface>();
         foreach (var ets in eyeTestSurfaces)
             ets.Clear();
 
-        if (timeElapse.Elapsed < highScore && eyeTestSurfaces.All(ets => ets.IsCorrect))
+        for (int i = 0; i < countdownTime; i++)
         {
-            highScore = timeElapse.Elapsed;
-            highScoreText.text = timeElapse.Elapsed.TotalSeconds.ToString("0.000");
+            countdownTimerText.text = (countdownTime - i).ToString();
+            yield return new WaitForSeconds(0.5f);
         }
-    }
-    else
-    {
-        highScoreText.text = string.Empty;
-        if (round % roundsPerVisualizeTime == 0)
-        {
-            time -= visualizeTimeDecrement;
-            visualizeTimeInput.text = time.ToString();
-        }
-    }
 
-    if (timeout < 0f)
-    {
-        var minTime = float.Parse(visualizeTimeMinInput.text);
-        if (time <= minTime && (round % roundsPerVisualizeTime == 0))
+        countdownTimerText.text = string.Empty;
+
+        // Precompute orientations for all surfaces
+        List<string> orientationsToUse;
+        if (round <= 10)
         {
-            highScoreText.text = "DONE";
+            orientationsToUse = GetEasySymbols(eyeTestSurfaces.Length);
+        }
+        else if (round <= 20)
+        {
+            orientationsToUse = GetMediumSymbols(eyeTestSurfaces.Length);
         }
         else
         {
-            yield return new WaitForSeconds(1f);
-            RepeatingRoutine();
+            orientationsToUse = GetHardSymbols(eyeTestSurfaces.Length);
         }
-    }
-}
 
-IEnumerator WaitForSingleInput(EyeTestSurface ets)
-{
-    bool inputReceived = false;
-
-    while (!inputReceived)
-    {
-        if (letterTypeDropdown.value == (int)EyeTestSurface.LetterType.SLOAN)
+        // Assign symbols to each surface
+        foreach (var ets in eyeTestSurfaces)
         {
-            yield return StartCoroutine(ets.WaitForLetterInput("?"));
+            ets.NextRandomSymbol(time, round, orientationsToUse);
+        }
+
+        // ---
+
+        var timeElapse = new Stopwatch();
+        timeElapse.Start();
+
+        //var elapsedTimes = new Dictionary<int, double>();
+        foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
+        {
+            if (time >= 0f)
+            {
+
+                if (letterTypeDropdown.value == (int)LetterType.SLOAN)
+                {
+                    yield return ets.WaitForLetterInput("?");
+                    fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
+                }
+                else
+                {
+                    yield return ets.WaitForArrowInput(displayText: "?");
+                    fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
+                }
+            }
+
+            yield return null;
+        }
+
+        if(time < 0f)
+        {
+            yield return WaitForSpace();
+            timeElapse.Stop();
+            foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
+            ets.Clear();
+
+            foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
+            {
+                if (letterTypeDropdown.value == (int)LetterType.SLOAN)
+                {
+                    yield return ets.WaitForLetterInput("?");
+                }
+                else
+                {
+                    yield return ets.WaitForArrowInput(displayText: "?");
+                }
+                fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
+
+                yield return null;
+            }
+
+            if(timeElapse.Elapsed < highScore && eyeTestSurfaces.All(ets => ets.IsCorrect))
+            {
+                highScore = timeElapse.Elapsed;
+                highScoreText.text = timeElapse.Elapsed.TotalSeconds.ToString("0.000");
+            }
         }
         else
         {
-            yield return StartCoroutine(ets.WaitForArrowInput("?"));
+            highScoreText.text = String.Empty;
+            if(round % roundsPerVisualizeTime == 0)
+            {
+                time -= visualizeTimeDecrement;
+                visualizeTimeInput.text = (time).ToString();
+            }
         }
 
-        // Confirm input was received for the specific EyeTestSurface
-        if (!string.IsNullOrEmpty(ets.Answer))
+        if (timeout < 0f)
         {
-            inputReceived = true;
+            var minTime = float.Parse(visualizeTimeMinInput.text);
+            if (time <= minTime && (round % roundsPerVisualizeTime == 0))
+            {
+                highScoreText.text = "DONE";
+            }
+            else
+            {
+                yield return new WaitForSeconds(1f);
+                RepeatingRoutine();
+            }
         }
-
-        yield return null; // Allow a frame delay
-    }
 }
-
-
 
 
 
@@ -258,6 +281,8 @@ IEnumerator WaitForSingleInput(EyeTestSurface ets)
     public void SetVergenceNearOrFar(int index)
     {
         var vergenceValue = (SurfaceType)index == SurfaceType.NEAR ? nearDisparity : farDisparity;
+        //vergenceObject.SetPositionZ(vergenceValue);
+        //vergenceSlider.SetValueWithoutNotify(vergenceValue);
         vergenceSlider.value = vergenceValue;
     }
 
