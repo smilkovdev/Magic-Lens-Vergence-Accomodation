@@ -28,6 +28,8 @@ public class ExperimentDriver : MonoBehaviour
     public TMP_Dropdown letterTypeDropdown;
     public ActivateAllDisplays displayManager;
     public TMP_Dropdown accommodationDropdown;
+    public Sprite mazeImage;
+    private string[] mazeAnswers;
 
     Coroutine procedureCoroutine;
     int round;
@@ -70,12 +72,26 @@ public class ExperimentDriver : MonoBehaviour
 
     // Start is called before the first frame update
     void Start()
-    {
-        countdownTimerText.text = string.Empty;
-        highScoreText.text = string.Empty;
+{
+    countdownTimerText.text = string.Empty;
+    highScoreText.text = string.Empty;
 
-        ChangeAccommodation(accommodationDropdown.value);
+    // Initialize the dropdown options
+    letterTypeDropdown.ClearOptions();
+    List<string> options = new List<string>() { "SLOAN", "LANDHOLT", "MAZE" };
+    letterTypeDropdown.AddOptions(options);
+    letterTypeDropdown.value = 0; // Default to SLOAN
+
+    // Load maze answers from file
+    TextAsset answersText = Resources.Load<TextAsset>("Mazes/maze_answers");
+    if (answersText != null)
+    {
+        mazeAnswers = answersText.text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
     }
+
+    ChangeAccommodation(accommodationDropdown.value);
+}
+
 
 
     public void StartProcedure()
@@ -90,6 +106,9 @@ public class ExperimentDriver : MonoBehaviour
         highScore = TimeSpan.MaxValue;
         highScoreText.text = String.Empty;
 
+        // Set the letter types for all surfaces according to the selected mode (SLOAN/LANDHOLT/MAZE)
+        SetLetterTypesForAllSurfaces(letterTypeDropdown.value);
+
         CancelInvoke(nameof(RepeatingRoutine));
 
         if (timeout < 0f)
@@ -100,10 +119,10 @@ public class ExperimentDriver : MonoBehaviour
         else
         {
             var repeatRate = time + countdownTime + timeout;
-
             InvokeRepeating(nameof(RepeatingRoutine), 0f, repeatRate);
         }
     }
+
 
     void RepeatingRoutine()
     {
@@ -113,59 +132,145 @@ public class ExperimentDriver : MonoBehaviour
         procedureCoroutine = StartCoroutine(VisualizeRandomLettersForTime());
     }
 
-
-
-    IEnumerator VisualizeRandomLettersForTime()
+    private void SetLetterTypesForAllSurfaces(int type)
+{
+    var eyeTestSurfaces = FindObjectsOfType<EyeTestSurface>();
+    foreach (var ets in eyeTestSurfaces)
     {
-        if (!float.TryParse(visualizeTimeInput.text, out float time))
+        ets.SetLetterType(type);
+        Debug.Log("Set letter type for " + ets.name + " to " + (LetterType)type);
+    }
+}
+
+
+   IEnumerator VisualizeRandomLettersForTime()
+{
+    if (!float.TryParse(visualizeTimeInput.text, out float time))
+        yield break;
+
+    round++;
+
+    var eyeTestSurfaces = FindObjectsOfType<EyeTestSurface>();
+    foreach (var ets in eyeTestSurfaces)
+        ets.Clear();
+
+    // Countdown before showing any symbol or maze
+    for (int i = 0; i < countdownTime; i++)
+    {
+        countdownTimerText.text = (countdownTime - i).ToString();
+        yield return new WaitForSeconds(0.5f);
+    }
+    countdownTimerText.text = string.Empty;
+
+    var timeElapse = new Stopwatch();
+    timeElapse.Start();
+
+    // Check what letter type we are dealing with
+    if (letterTypeDropdown.value == (int)LetterType.MAZE)
+    {
+        // MAZE LOGIC
+        int mazeIndex = round - 1; // Maze1 for round=1, Maze2 for round=2, etc.
+        string mazeName = "Maze" + round; // "Maze1", "Maze2", etc.
+        Sprite mazeSprite = Resources.Load<Sprite>("Mazes/" + mazeName);
+
+        if (mazeSprite == null)
+        {
+            UnityEngine.Debug.LogError("Maze image not found: " + mazeName);
             yield break;
+        }
 
-        round++;
+        // Show maze on each surface (adapt if you want splitting)
+        foreach (var ets in eyeTestSurfaces)
+        {
+            ets.SetMazeImage(mazeSprite); 
+        }
 
-        var eyeTestSurfaces = FindObjectsOfType<EyeTestSurface>();
+        // Wait 1 second showing the maze
+        yield return new WaitForSeconds(1f);
+
+        // Clear maze image after 1 second
         foreach (var ets in eyeTestSurfaces)
             ets.Clear();
 
-        for (int i = 0; i < countdownTime; i++)
+        // Wait for user input A, B, C, or D
+        string userInput = "";
+        bool validInput = false;
+        while (!validInput)
         {
-            countdownTimerText.text = (countdownTime - i).ToString();
-            yield return new WaitForSeconds(0.5f);
+            if (Input.GetKeyUp(KeyCode.A)) { userInput = "A"; validInput = true; }
+            else if (Input.GetKeyUp(KeyCode.B)) { userInput = "B"; validInput = true; }
+            else if (Input.GetKeyUp(KeyCode.C)) { userInput = "C"; validInput = true; }
+            else if (Input.GetKeyUp(KeyCode.D)) { userInput = "D"; validInput = true; }
+
+            yield return null;
         }
 
-        countdownTimerText.text = string.Empty;
-
-        // Precompute orientations for all surfaces
-        List<string> orientationsToUse;
-        if (round <= 10)
+        // Check correctness
+        bool isCorrect = false;
+        string correctAnswer = "";
+        if (mazeAnswers != null && mazeIndex < mazeAnswers.Length)
         {
-            orientationsToUse = GetEasySymbols(eyeTestSurfaces.Length);
-        }
-        else if (round <= 20)
-        {
-            orientationsToUse = GetMediumSymbols(eyeTestSurfaces.Length);
+            correctAnswer = mazeAnswers[mazeIndex].Trim();
+            isCorrect = userInput.Equals(correctAnswer, StringComparison.OrdinalIgnoreCase);
         }
         else
         {
-            orientationsToUse = GetHardSymbols(eyeTestSurfaces.Length);
+            UnityEngine.Debug.LogError("No answer found for maze index: " + mazeIndex);
         }
 
-        // Assign symbols to each surface
+        // Display feedback
+        foreach (var ets in eyeTestSurfaces)
+        {
+            ets.ShowMazeFeedback(isCorrect);
+        }
+
+        // Log the result
+        foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
+        {
+            fileOutput.WriteToFile(ets.order, ets.surfaceType, mazeName, userInput, isCorrect, round, timeElapse.Elapsed.TotalSeconds, LetterType.MAZE);
+        }
+
+        // Handle repeating logic or stopping conditions
+        if (timeout < 0f)
+        {
+            var minTime = float.Parse(visualizeTimeMinInput.text);
+            // Maze might not need visualize time adjustments
+            if (time <= minTime && (round % roundsPerVisualizeTime == 0))
+            {
+                highScoreText.text = "DONE";
+            }
+            else
+            {
+                yield return new WaitForSeconds(1f);
+                RepeatingRoutine();
+            }
+        }
+        else
+        {
+            // If timeout >= 0, the InvokeRepeating might handle next call automatically
+        }
+    }
+    else
+    {
+        // SLOAN/LANDHOLT LOGIC
+
+        // Precompute orientations for all surfaces
+        List<string> orientationsToUse;
+        if (round <= 10) orientationsToUse = GetEasySymbols(eyeTestSurfaces.Length);
+        else if (round <= 20) orientationsToUse = GetMediumSymbols(eyeTestSurfaces.Length);
+        else orientationsToUse = GetHardSymbols(eyeTestSurfaces.Length);
+
+        // Assign symbols to each surface for SLOAN/LANDHOLT
         foreach (var ets in eyeTestSurfaces)
         {
             ets.NextRandomSymbol(time, round, orientationsToUse);
         }
 
-        // ---
-
-        var timeElapse = new Stopwatch();
-        timeElapse.Start();
-
-        //var elapsedTimes = new Dictionary<int, double>();
+        // Wait for input per surface
         foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
         {
             if (time >= 0f)
             {
-
                 if (letterTypeDropdown.value == (int)LetterType.SLOAN)
                 {
                     yield return ets.WaitForLetterInput("?");
@@ -186,8 +291,9 @@ public class ExperimentDriver : MonoBehaviour
             yield return WaitForSpace();
             timeElapse.Stop();
             foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
-            ets.Clear();
+                ets.Clear();
 
+            // Another round of inputs if needed
             foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
             {
                 if (letterTypeDropdown.value == (int)LetterType.SLOAN)
@@ -232,7 +338,9 @@ public class ExperimentDriver : MonoBehaviour
                 RepeatingRoutine();
             }
         }
+    }
 }
+
 
 
 

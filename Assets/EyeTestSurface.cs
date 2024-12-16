@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq; 
 using TMPro;
 using UnityEngine;
@@ -13,12 +12,16 @@ public class EyeTestSurface : MonoBehaviour
     public LetterType letterType;
     public TMP_Text tmpText;
     public int order;
+    public UnityEngine.UI.Image mazeImageUI;
+    public Sprite mazeImageTop;
+    public Sprite mazeImageMiddle;
+    public Sprite mazeImageBottom;
 
-    readonly string[] sloanLetters = new[] { "C", "D", "H", "K", "N", "O", "R", "S", "V" };
-    readonly int[] landholtRotations = new[] { 0, 90, 180, 270 };
+    readonly string[] sloanLetters = { "C", "D", "H", "K", "N", "O", "R", "S", "V" };
+    private readonly List<string> orientations = new List<string> { "Up", "Down", "Left", "Right" };
+
     float previousZEuler;
     string previousText;
-    private readonly List<string> orientations = new List<string> { "Up", "Down", "Left", "Right" };
 
     public enum SurfaceType
     {
@@ -29,68 +32,88 @@ public class EyeTestSurface : MonoBehaviour
     public enum LetterType
     {
         SLOAN,
-        LANDHOLT
+        LANDHOLT,
+        MAZE
     }
 
-    // Start is called before the first frame update
+    // Keep EyeTestSurface focused on its own logic only
     void Start()
     {
-        
+        // If needed, initialize something here
     }
-
 
     public void NextRandomSymbol(float visibleSeconds, int round, List<string> orientationsToUse)
     {
         switch (letterType)
         {
             case LetterType.SLOAN:
+                tmpText.enabled = true;
+                mazeImageUI.enabled = false;
                 tmpText.text = sloanLetters[Random.Range(0, sloanLetters.Length)];
                 tmpText.rectTransform.localEulerAngles = Vector3.zero;
                 break;
 
             case LetterType.LANDHOLT:
-                // Assign orientation based on order
+                tmpText.enabled = true;
+                mazeImageUI.enabled = false;
                 string orientation = orientationsToUse[order % orientationsToUse.Count];
                 SetOrientation(orientation);
-                tmpText.text = "C"; // Always "C" for Landolt C
+                tmpText.text = "C";
+                break;
+
+            case LetterType.MAZE:
+                // Maze display logic might be handled differently by the ExperimentDriver
+                // Typically, Maze logic sets the image externally via SetMazeImage.
+                tmpText.enabled = false;
+                mazeImageUI.enabled = true;
+                // If you were to handle it here, pick the correct sprite as done before:
+                // But generally, Maze images get set by the driver, not here.
                 break;
         }
 
         previousZEuler = tmpText.rectTransform.localEulerAngles.z;
         previousText = tmpText.text;
 
-        if (visibleSeconds > 0f)
+        // Only clear automatically if we have a positive visibleSeconds and are not Maze
+        if (visibleSeconds > 0f && letterType != LetterType.MAZE)
             Invoke(nameof(Clear), visibleSeconds);
     }
 
     private void SetOrientation(string orientation)
-{
-    switch (orientation)
     {
-        case "Up":
-            tmpText.rectTransform.localEulerAngles = Vector3.forward * 90;
-            break;
-        case "Down":
-            tmpText.rectTransform.localEulerAngles = Vector3.forward * 270;
-            break;
-        case "Left":
-            tmpText.rectTransform.localEulerAngles = Vector3.forward * 180;
-            break;
-        case "Right":
-            tmpText.rectTransform.localEulerAngles = Vector3.forward * 0;
-            break;
-        default:
-            tmpText.rectTransform.localEulerAngles = Vector3.zero; // Default fallback
-            break;
+        switch (orientation)
+        {
+            case "Up":
+                tmpText.rectTransform.localEulerAngles = Vector3.forward * 90;
+                break;
+            case "Down":
+                tmpText.rectTransform.localEulerAngles = Vector3.forward * 270;
+                break;
+            case "Left":
+                tmpText.rectTransform.localEulerAngles = Vector3.forward * 180;
+                break;
+            case "Right":
+                tmpText.rectTransform.localEulerAngles = Vector3.forward * 0;
+                break;
+            default:
+                tmpText.rectTransform.localEulerAngles = Vector3.zero; 
+                break;
+        }
     }
-}
-
 
     public void Clear()
     {
-        tmpText.text = order == 1 ? "?" : string.Empty;
-        tmpText.color = Color.red;
-        tmpText.rectTransform.localEulerAngles = Vector3.zero;
+        if (letterType == LetterType.MAZE)
+        {
+            mazeImageUI.enabled = false;
+            mazeImageUI.sprite = null;
+        }
+        else
+        {
+            tmpText.text = order == 1 ? "?" : string.Empty;
+            tmpText.color = Color.red;
+            tmpText.rectTransform.localEulerAngles = Vector3.zero;
+        }
     }
 
     public void SetLetterType(int type)
@@ -103,11 +126,11 @@ public class EyeTestSurface : MonoBehaviour
         var wait = true;
         while (wait)
         {
-            var down = Input.GetKeyUp(KeyCode.DownArrow);
-            var up = Input.GetKeyUp(KeyCode.UpArrow);
-            var left = Input.GetKeyUp(KeyCode.LeftArrow);
-            var right = Input.GetKeyUp(KeyCode.RightArrow);
-            var isLandholt = letterType == LetterType.LANDHOLT;
+            bool down = Input.GetKeyUp(KeyCode.DownArrow);
+            bool up = Input.GetKeyUp(KeyCode.UpArrow);
+            bool left = Input.GetKeyUp(KeyCode.LeftArrow);
+            bool right = Input.GetKeyUp(KeyCode.RightArrow);
+            bool isLandholt = letterType == LetterType.LANDHOLT;
 
             if (down || up || left || right)
             {
@@ -193,7 +216,7 @@ public class EyeTestSurface : MonoBehaviour
                     return previousText;
                 case LetterType.LANDHOLT:
                     return previousZEuler.ToString();
-                default: 
+                default:
                     return string.Empty;
             }
         }
@@ -215,11 +238,9 @@ public class EyeTestSurface : MonoBehaviour
         }
     }
 
-    // New method for setting the symbol based on a specific orientation
-   public void SetSymbol(string orientation)
+    public void SetSymbol(string orientation)
     {
-        tmpText.text = "C"; // Ensure the symbol is set to a Landolt C
-
+        tmpText.text = "C"; 
         switch (orientation)
         {
             case "Up":
@@ -236,7 +257,7 @@ public class EyeTestSurface : MonoBehaviour
                 break;
             default:
                 UnityEngine.Debug.LogWarning("Unknown orientation specified.");
-                tmpText.rectTransform.localEulerAngles = Vector3.zero; // Default fallback
+                tmpText.rectTransform.localEulerAngles = Vector3.zero; 
                 break;
         }
 
@@ -244,4 +265,17 @@ public class EyeTestSurface : MonoBehaviour
         previousText = tmpText.text;
     }
 
+    public void SetMazeImage(Sprite mazeSprite)
+    {
+        letterType = LetterType.MAZE;
+        tmpText.enabled = false;  
+        mazeImageUI.enabled = true;
+        mazeImageUI.sprite = mazeSprite;
+        mazeImageUI.color = Color.white;
+    }
+
+    public void ShowMazeFeedback(bool isCorrect)
+    {
+        mazeImageUI.color = isCorrect ? Color.green : Color.gray;
+    }
 }
