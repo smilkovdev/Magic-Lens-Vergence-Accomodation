@@ -29,8 +29,19 @@ public class EyeTestSurface : MonoBehaviour
     public enum LetterType
     {
         SLOAN,
-        LANDHOLT
+        LANDHOLT,
+        WORDGAME // New type for the word-based game
     }
+
+    private readonly List<string> words = new List<string> 
+    {
+        "UNITY",
+        "VISION",
+        "MAZE",
+        "CLEAR",
+        "SHAPE"
+    };
+
 
     // Start is called before the first frame update
     void Start()
@@ -243,5 +254,50 @@ public class EyeTestSurface : MonoBehaviour
         previousZEuler = tmpText.rectTransform.localEulerAngles.z;
         previousText = tmpText.text;
     }
+
+    public void SetWord(string word, int index)
+    {
+        if (index < word.Length)
+        {
+            tmpText.text = word[index].ToString(); // Assign one character per surface
+            tmpText.color = Color.white;
+        }
+        else
+        {
+            tmpText.text = string.Empty; // Clear extra fields if not enough characters
+        }
+    }
+
+    public IEnumerator WaitForWordInput(string word, int index)
+    {
+        var wait = true;
+        while (wait)
+        {
+            foreach (KeyCode kcode in Enum.GetValues(typeof(KeyCode)))
+            {
+                if (Input.GetKeyUp(kcode) && (int)kcode < 123)
+                {
+                    tmpText.text = kcode.ToString();
+                    tmpText.color = (tmpText.text == word[index].ToString()) ? Color.green : Color.red;
+                    wait = false;
+                    break;
+                }
+            }
+            yield return null;
+        }
+    }
+
+    public void SetResult(bool isCorrect)
+    {
+        if (isCorrect)
+        {
+            tmpText.color = Color.green; // Highlight in green for correct input
+        }
+        else
+        {
+            tmpText.color = Color.red; // Highlight in red for incorrect input
+        }
+    }
+
 
 }

@@ -32,6 +32,15 @@ public class ExperimentDriver : MonoBehaviour
     Coroutine procedureCoroutine;
     int round;
 
+    private readonly List<string> words = new List<string>
+    {
+        "CAT",
+        "DOG",
+        "SUN",
+        "BOX",
+        "MAP"
+    };
+
     // Define orientations for Landolt C shapes
     private readonly List<string> orientations = new List<string> { "Up", "Down", "Left", "Right" };
 
@@ -73,6 +82,7 @@ public class ExperimentDriver : MonoBehaviour
     {
         countdownTimerText.text = string.Empty;
         highScoreText.text = string.Empty;
+        letterTypeDropdown.options.Add(new TMP_Dropdown.OptionData("Word Game"));
 
         ChangeAccommodation(accommodationDropdown.value);
     }
@@ -115,7 +125,7 @@ public class ExperimentDriver : MonoBehaviour
 
 
 
-    IEnumerator VisualizeRandomLettersForTime()
+  IEnumerator VisualizeRandomLettersForTime()
     {
         if (!float.TryParse(visualizeTimeInput.text, out float time))
             yield break;
@@ -124,8 +134,9 @@ public class ExperimentDriver : MonoBehaviour
 
         var eyeTestSurfaces = FindObjectsOfType<EyeTestSurface>();
         foreach (var ets in eyeTestSurfaces)
-            ets.Clear();
+            ets.Clear(); // Ensure sections are cleared at the start
 
+        // Countdown before displaying the word
         for (int i = 0; i < countdownTime; i++)
         {
             countdownTimerText.text = (countdownTime - i).ToString();
@@ -134,88 +145,115 @@ public class ExperimentDriver : MonoBehaviour
 
         countdownTimerText.text = string.Empty;
 
-        // Precompute orientations for all surfaces
-        List<string> orientationsToUse;
-        if (round <= 10)
-        {
-            orientationsToUse = GetEasySymbols(eyeTestSurfaces.Length);
-        }
-        else if (round <= 20)
-        {
-            orientationsToUse = GetMediumSymbols(eyeTestSurfaces.Length);
-        }
-        else
-        {
-            orientationsToUse = GetHardSymbols(eyeTestSurfaces.Length);
-        }
-
-        // Assign symbols to each surface
-        foreach (var ets in eyeTestSurfaces)
-        {
-            ets.NextRandomSymbol(time, round, orientationsToUse);
-        }
-
-        // ---
-
         var timeElapse = new Stopwatch();
         timeElapse.Start();
 
-        //var elapsedTimes = new Dictionary<int, double>();
-        foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
+        if (letterTypeDropdown.value == (int)LetterType.WORDGAME)
         {
-            if (time >= 0f)
-            {
+            // Select a random three-letter word
+            string word = words[Random.Range(0, words.Count)]; // Random word (ensure all words are three letters)
 
-                if (letterTypeDropdown.value == (int)LetterType.SLOAN)
+            // Assign each letter to a surface
+            for (int i = 0; i < eyeTestSurfaces.Length; i++)
+            {
+                if (i < word.Length)
                 {
-                    yield return ets.WaitForLetterInput("?");
-                    fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
+                    string letter = word.Substring(i, 1); // Get individual letter
+                    eyeTestSurfaces[i].SetWord(letter, 0); // Display the letter on the surface
                 }
                 else
                 {
-                    yield return ets.WaitForArrowInput(displayText: "?");
-                    fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
+                    eyeTestSurfaces[i].Clear(); // Clear unused surfaces
                 }
             }
 
-            yield return null;
-        }
+            // Show the word for a second, then clear the surfaces
+            yield return new WaitForSeconds(1f);
+            foreach (var ets in eyeTestSurfaces)
+                ets.Clear();
 
-        if(time < 0f)
-        {
-            yield return WaitForSpace();
-            timeElapse.Stop();
-            foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
-            ets.Clear();
-
-            foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
+            // Wait for user input for each surface
+            string userGuess = "";
+            foreach (var ets in eyeTestSurfaces)
             {
-                if (letterTypeDropdown.value == (int)LetterType.SLOAN)
-                {
-                    yield return ets.WaitForLetterInput("?");
-                }
-                else
-                {
-                    yield return ets.WaitForArrowInput(displayText: "?");
-                }
-                fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
-
-                yield return null;
+                yield return ets.WaitForLetterInput("?"); // Wait for user input
+                userGuess += ets.Answer; // Collect the user's input
             }
 
-            if(timeElapse.Elapsed < highScore && eyeTestSurfaces.All(ets => ets.IsCorrect))
+            // Validate the input and display results
+            bool isCorrect = userGuess == word;
+            foreach (var ets in eyeTestSurfaces)
             {
-                highScore = timeElapse.Elapsed;
-                highScoreText.text = timeElapse.Elapsed.TotalSeconds.ToString("0.000");
+                ets.SetResult(isCorrect); // Highlight correct/incorrect on each surface
             }
+
+            // Save the results to the file
+            fileOutput.WriteToFile(
+                0, // Assuming all sections contribute to the same result
+                SurfaceType.NEAR, // Example surface type
+                word,
+                userGuess,
+                isCorrect,
+                round,
+                timeElapse.Elapsed.TotalSeconds,
+                LetterType.WORDGAME
+            );
+
+            // Wait briefly before proceeding to the next round
+            yield return new WaitForSeconds(1f);
         }
         else
         {
-            highScoreText.text = String.Empty;
-            if(round % roundsPerVisualizeTime == 0)
+            // Existing logic for SLOAN and LANDHOLT
+            List<string> orientationsToUse;
+            if (round <= 10)
+            {
+                orientationsToUse = GetEasySymbols(eyeTestSurfaces.Length);
+            }
+            else if (round <= 20)
+            {
+                orientationsToUse = GetMediumSymbols(eyeTestSurfaces.Length);
+            }
+            else
+            {
+                orientationsToUse = GetHardSymbols(eyeTestSurfaces.Length);
+            }
+
+            foreach (var ets in eyeTestSurfaces)
+            {
+                ets.NextRandomSymbol(time, round, orientationsToUse);
+            }
+
+            foreach (var ets in eyeTestSurfaces.OrderBy(e => e.order))
+            {
+                if (time >= 0f)
+                {
+                    if (letterTypeDropdown.value == (int)LetterType.SLOAN)
+                    {
+                        yield return ets.WaitForLetterInput("?");
+                        fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
+                    }
+                    else
+                    {
+                        yield return ets.WaitForArrowInput(displayText: "?");
+                        fileOutput.WriteToFile(ets.order, ets.surfaceType, ets.Question, ets.Answer, ets.IsCorrect, round, timeElapse.Elapsed.TotalSeconds, ets.letterType);
+                    }
+                }
+            }
+        }
+
+        // Handle timeout logic
+        if (time < 0f)
+        {
+            yield return WaitForSpace();
+        }
+        else
+        {
+            highScoreText.text = string.Empty;
+            if (round % roundsPerVisualizeTime == 0)
             {
                 time -= visualizeTimeDecrement;
-                visualizeTimeInput.text = (time).ToString();
+                visualizeTimeInput.text = time.ToString();
             }
         }
 
@@ -232,7 +270,10 @@ public class ExperimentDriver : MonoBehaviour
                 RepeatingRoutine();
             }
         }
-}
+    }
+
+
+
 
 
 
