@@ -31,6 +31,7 @@ public class ExperimentDriver : MonoBehaviour
 
     Coroutine procedureCoroutine;
     int round;
+    const int MAX_ROUNDS = 30;
 
     // Define orientations for Landolt C shapes
     private readonly List<string> orientations = new List<string> { "Up", "Down", "Left", "Right" };
@@ -107,6 +108,12 @@ public class ExperimentDriver : MonoBehaviour
 
     void RepeatingRoutine()
     {
+        if (round >= MAX_ROUNDS)  // Stop after 30 rounds
+        {
+            CancelInvoke(nameof(RepeatingRoutine));
+            return;
+        }
+
         if (procedureCoroutine != null)
             StopCoroutine(procedureCoroutine);
 
@@ -117,6 +124,9 @@ public class ExperimentDriver : MonoBehaviour
 
     IEnumerator VisualizeRandomLettersForTime()
     {
+        if (round >= MAX_ROUNDS) // Stop execution after 30 rounds
+            yield break;
+
         if (!float.TryParse(visualizeTimeInput.text, out float time))
             yield break;
 
@@ -217,6 +227,13 @@ public class ExperimentDriver : MonoBehaviour
                 time -= visualizeTimeDecrement;
                 visualizeTimeInput.text = (time).ToString();
             }
+        }
+
+        if (round >= MAX_ROUNDS) // Stop after 30 rounds
+        {
+            highScoreText.text = "DONE";
+            CancelInvoke(nameof(RepeatingRoutine));
+            yield break;
         }
 
         if (timeout < 0f)
